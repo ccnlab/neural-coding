@@ -1,0 +1,67 @@
+classdef GaussianProcessRegression < ResponseModel    
+% GP regression where we assume that the data of interest is a tensor whose
+% kernel function can be written in Kronecker form
+    
+    properties
+              
+        % normalization parameters
+        mux, sdx, muy, sdy
+        
+        gp % gaussian process
+
+    end
+    
+    methods
+        
+        function obj = GaussianProcessRegression(varargin)
+            
+            obj = obj@ResponseModel(varargin{:});
+            
+        end
+        
+        function obj = fit(obj,X,Y)            
+            
+            % normalize (required for Y given zero mean GP; useful in
+            % general when setting hyper-parameters; take with LOO settings)
+            [X,obj.mux,obj.sdx] = zscore(X);
+            [Y,obj.muy,obj.sdy] = zscore(Y);
+            
+            lik = lik_gaussian('sigma2', 0.2^2);
+            gpcf = gpcf_sexp('lengthScale', [1.1 1.2], 'magnSigma2', 0.2^2);
+            
+            % Set some priors
+            pn = prior_logunif();
+            lik = lik_gaussian(lik,'sigma2_prior', pn);
+            pl = prior_unif();
+            pm = prior_sqrtunif();
+            gpcf = gpcf_sexp(gpcf, 'lengthScale_prior', pl, 'magnSigma2_prior', pm);
+            
+            % Following lines do the same since the default type is FULL
+            %gp = gp_set('type','FULL','lik',lik,'cf',gpcf);
+            gp = gp_set('lik', lik, 'cf', gpcf);
+            
+            % Set the options for the scaled conjugate optimization
+            opt=optimset('TolFun',1e-3,'TolX',1e-3,'Display','iter');
+
+            % Optimize with the scaled conjugate gradient method
+            % reformulation of the data vec(Y) = (B' \kron A) * f
+            %obj.gp=gp_optim(gpt,kron(eye(size(X,1)),X),vec(Y),'optimf',@fminscg,'opt',opt);
+            obj.gp=gp_optim(gpt,X,Y,'optimf',@fminscg,'opt',opt);
+             
+        end
+        
+        function [EY,VarY] = predict(obj,X,Xtrain,Ytrain)
+                        
+            X = bsxfun(@rdivide,bsxfun(@minus,X,obj.mux),obj.sdx);
+            Xtrain = bsxfun(@rdivide,bsxfun(@minus,Xtrain,obj.mux),obj.sdx);
+            Ytrain = bsxfun(@rdivide,bsxfun(@minus,Ytrain,obj.muy),obj.sdy);
+            
+            [EY, VarY] = gp_pred(obj.gp, Xtrain, Ytrain, X);
+            
+            EY = bsxfun(@plus,EY,obj.muy);
+                
+
+        end        
+             
+    end
+end
