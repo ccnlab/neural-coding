@@ -26,7 +26,7 @@ clear EstimatedResponses
 
 %% choose random subset of voxels for demonstration purposes
 
-nvoxels = 20;
+nvoxels = 5;
 prm = randperm(size(training_response,2));
 training_response = training_response(:,prm(1:nvoxels));
 test_response = test_response(:,prm(1:nvoxels));
@@ -81,7 +81,8 @@ for index = 1 : test_stimulus_size(1)
     recon(index,:,:) = test_stimulus(identification_index(index),:,:);
 end
 
-disp(['identification performance: ' num2str(100 * mean(identification_index' == 1 : test_stimulus_size(1))) '% (accuracy)']);
+%% Analyze identification performance
 
+disp(['identification performance: ' num2str(100 * mean(identification_index' == 1 : test_stimulus_size(1))) '% (accuracy)']);
 
 

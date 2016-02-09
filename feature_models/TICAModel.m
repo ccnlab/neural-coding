@@ -1,0 +1,61 @@
+classdef TICAModel < FeatureModel
+    %Feature model provides identity mapping
+    
+    properties
+        
+        H 
+        
+        W % filters 
+        
+        feature_size = [16 16 12 16];
+        patch_number = 1000; %50000;
+        neighborhood_size = [5 5]; 
+        step_number = 100;
+        
+        static_nonlinearity = @(input_arg) log(1 + abs(input_arg));
+        
+        patch
+        
+    end
+    
+    methods
+        
+        function obj = TICAModel(varargin)
+            
+            obj = obj@FeatureModel(varargin{:});
+            
+        end
+        
+        function obj = fit(obj,X)            
+            
+            % required permutation (can be optimized)
+            X = permute(X,[2 3 1]);
+            
+            stim_size = size(X);
+            for index = obj.patch_number : -1 : 1
+                obj.patch(:, index) = subsref(X((1 : obj.feature_size(1)) + randi(stim_size(1) - obj.feature_size(1)), (1 : obj.feature_size(2)) + randi(stim_size(2)  - obj.feature_size(2)), randi(stim_size(3))), substruct('()', {':'}));
+            end
+            
+            [obj.H, obj.W] = TICA([obj.feature_size([3 4]) obj.neighborhood_size obj.step_number], obj.patch);
+            
+        end
+        
+        function Y = predict(obj,X)
+            
+            % required permutation (can be optimized)
+            X = permute(X,[2 3 1]);
+      
+            stim_size = size(X);
+            nfeatures = size(obj.W,1) * size(X,1)*size(X,2) / prod(obj.feature_size([1 2]));
+            Y = zeros(stim_size(3),nfeatures);
+            
+            % specific to TICA
+            for index = stim_size(3) : -1 : 1
+                Y(index,:) = subsref(obj.static_nonlinearity(obj.H * (obj.W * im2col(X(:, :, index), obj.feature_size([1 2]), 'distinct')) .^ 2), substruct('()', {':'}));
+            end
+            
+        end
+        
+    end
+    
+end
